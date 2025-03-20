@@ -1,0 +1,48 @@
+name: MLOps Pipeline with Drift Detection
+
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: "0 0 * * *"  # Runs daily at midnight UTC
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+
+      - name: Install Dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Linting
+        run: |
+          pip install flake8 black
+          flake8 --ignore=E501 .
+          black --check .
+
+      - name: Run Tests
+        run: |
+          pip install pytest
+          pytest tests/
+
+      - name: Train & Log Model
+        run: python train_model.py
+
+      - name: Run Drift Detection
+        run: python drift_detection.py
+
+      - name: Deploy Model
+        if: success()
+        run: |
+          docker build -t fashion-mnist-api .
+          docker run -d -p 8000:8000 fashion-mnist-api
